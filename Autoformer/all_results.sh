@@ -32,8 +32,18 @@ for dirpath, _, filenames in os.walk(root):
     try:
       arr = np.load(path)
       flat = arr.ravel()
-      preview = flat[:8]
-      print(f"type=npy shape={arr.shape} preview={preview}")
+      mae = flat[0] if flat.size > 0 else None
+      mse = flat[1] if flat.size > 1 else None
+
+      def fmt(v):
+        if v is None:
+          return "---"
+        try:
+          return f"{float(v):.6f}"
+        except Exception:
+          return str(v)
+
+      print(f"mae: {fmt(mae)} mse: {fmt(mse)} (shape={arr.shape})")
     except Exception as e:
       print(f"[error reading file: {e}]")
     print()
