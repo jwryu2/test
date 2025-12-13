@@ -1,58 +1,42 @@
-# export CUDA_VISIBLE_DEVICES=1
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Combined 3 (LR modes) x 4 (AC variants) x 2 (pred_len) = 24 runs.
+# Runs one ablation combo, then prints the same summary used in the 24-run script.
 
-pred_lens=(96 192)
+# Choose your single combination here.
+pred_len=96
+lr_entry="OFF 0 0 0.0"   # name mode warmup min_lr
+ac_entry="BASE 1.0 0"    # name ac_temp ac_norm
 
-# lr modes: name mode warmup min_lr
-lr_modes=(
-  "OFF 0 0 0.0"
-  "COSINE 1 0 1e-6"
-  "WARMUP_COSINE 2 3 1e-6"
-)
+read -r lr_name lr_mode warmup min_lr <<<"${lr_entry}"
+read -r ac_name ac_temp ac_norm <<<"${ac_entry}"
 
-# autocorr variants: name ac_temp ac_norm
-ac_variants=(
-  "BASE 1.0 0"
-  "TEMP 2.0 0"
-  "NORM 1.0 1"
-  "TEMP_NORM 2.0 1"
-)
-
-for pl in "${pred_lens[@]}"; do
-  for lr_entry in "${lr_modes[@]}"; do
-    read -r lr_name lr_mode warmup min_lr <<<"${lr_entry}"
-    for ac_entry in "${ac_variants[@]}"; do
-      read -r ac_name ac_temp ac_norm <<<"${ac_entry}"
-      model_id="ECL_96_${pl}_LR_${lr_name}_${ac_name}"
-      echo ">>> Running ${model_id}"
-      python -u run.py \
-        --is_training 1 \
-        --root_path ./dataset/electricity/ \
-        --data_path electricity.csv \
-        --model_id "${model_id}" \
-        --model Autoformer \
-        --data custom \
-        --features M \
-        --seq_len 96 \
-        --label_len 48 \
-        --pred_len "${pl}" \
-        --e_layers 2 \
-        --d_layers 1 \
-        --factor 3 \
-        --enc_in 321 \
-        --dec_in 321 \
-        --c_out 321 \
-        --des 'Exp' \
-        --itr 1 \
-        --lr_schedule_mode "${lr_mode}" \
-        --warmup_epochs "${warmup}" \
-        --min_lr "${min_lr}" \
-        --ac_temp "${ac_temp}" \
-        --ac_norm "${ac_norm}"
-    done
-  done
-done
+model_id="ECL_96_${pred_len}_LR_${lr_name}_${ac_name}"
+echo ">>> Running ${model_id}"
+python -u run.py \
+  --is_training 1 \
+  --root_path ./dataset/electricity/ \
+  --data_path electricity.csv \
+  --model_id "${model_id}" \
+  --model Autoformer \
+  --data custom \
+  --features M \
+  --seq_len 96 \
+  --label_len 48 \
+  --pred_len "${pred_len}" \
+  --e_layers 2 \
+  --d_layers 1 \
+  --factor 3 \
+  --enc_in 321 \
+  --dec_in 321 \
+  --c_out 321 \
+  --des 'Exp' \
+  --itr 1 \
+  --lr_schedule_mode "${lr_mode}" \
+  --warmup_epochs "${warmup}" \
+  --min_lr "${min_lr}" \
+  --ac_temp "${ac_temp}" \
+  --ac_norm "${ac_norm}"
 
 python - <<'PY'
 import numpy as np
@@ -84,10 +68,12 @@ lr_modes = [
 ]
 ac_variants = ["BASE", "TEMP", "NORM", "TEMP_NORM"]
 
+
 def fmt_setting(params, idx=0):
     return "{model_id}_{model}_{data}_ft{features}_sl{seq_len}_ll{label_len}_pl{pred_len}_dm{d_model}_nh{n_heads}_el{e_layers}_dl{d_layers}_df{d_ff}_fc{factor}_eb{embed}_dt{distil}_{des}_{idx}".format(
         idx=idx, **params
     )
+
 
 print("\n====== 24-Run Ablation Summary (LR x AC x pred_len) ======")
 for pl in pred_lens:
