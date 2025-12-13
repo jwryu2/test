@@ -115,6 +115,19 @@ class Exp_Main(Exp_Basic):
 
         model_optim = self._select_optimizer()
         criterion = self._select_criterion()
+        base_lr = self.args.learning_rate
+        lr_mode = getattr(self.args, 'lr_schedule_mode', 0)
+        warmup_epochs = getattr(self.args, 'warmup_epochs', 0)
+        min_lr = getattr(self.args, 'min_lr', 0.0)
+        scheduler = None
+        if lr_mode == 1:
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                model_optim, T_max=self.args.train_epochs, eta_min=min_lr)
+        elif lr_mode == 2:
+            cosine_epochs = max(self.args.train_epochs - warmup_epochs, 1)
+            if self.args.train_epochs > warmup_epochs:
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    model_optim, T_max=cosine_epochs, eta_min=min_lr)
 
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
@@ -122,6 +135,11 @@ class Exp_Main(Exp_Basic):
         for epoch in range(self.args.train_epochs):
             iter_count = 0
             train_loss = []
+
+            if lr_mode == 2 and warmup_epochs > 0 and epoch < warmup_epochs:
+                warmup_lr = base_lr * float(epoch + 1) / float(max(1, warmup_epochs))
+                for param_group in model_optim.param_groups:
+                    param_group['lr'] = warmup_lr
 
             self.model.train()
             epoch_time = time.time()
@@ -162,12 +180,19 @@ class Exp_Main(Exp_Basic):
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+            current_lr = model_optim.param_groups[0]['lr']
+            print("Epoch: {0} | lr={1:.6f}".format(epoch + 1, current_lr))
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
 
-            adjust_learning_rate(model_optim, epoch + 1, self.args)
+            if lr_mode == 0:
+                adjust_learning_rate(model_optim, epoch + 1, self.args)
+            elif lr_mode == 1 and scheduler is not None:
+                scheduler.step()
+            elif lr_mode == 2 and scheduler is not None and epoch >= warmup_epochs:
+                scheduler.step()
 
         best_model_path = path + '/' + 'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))

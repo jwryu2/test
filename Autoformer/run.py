@@ -69,14 +69,15 @@ def main():
     parser.add_argument('--batch_size', type=int, default=32, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
+    parser.add_argument('--lr_schedule_mode', type=int, default=0,
+                        help='0=off, 1=cosine cooldown, 2=warmup+cosine')
+    parser.add_argument('--warmup_epochs', type=int, default=0, help='warmup epochs for lr schedule mode 2')
+    parser.add_argument('--min_lr', type=float, default=0.0, help='minimum lr for cosine cooldown')
     parser.add_argument('--des', type=str, default='test', help='exp description')
     parser.add_argument('--loss', type=str, default='mse', help='loss function')
     parser.add_argument('--lradj', type=str, default='type1', help='adjust learning rate')
     parser.add_argument('--use_amp', action='store_true', help='use automatic mixed precision training', default=False)
 
-    print(torch.cuda.is_available())
-    print(torch.cuda.device_count())
-    print(torch.cuda.current_device())
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
     parser.add_argument('--gpu', type=int, default=0, help='gpu')
