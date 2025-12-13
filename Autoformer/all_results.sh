@@ -13,7 +13,7 @@ if [ ! -d "${RESULTS_DIR}" ]; then
   exit 1
 fi
 
-python - <<'PY'
+python - "${RESULTS_DIR}" <<'PY'
 import os
 import sys
 import numpy as np
@@ -45,4 +45,4 @@ for dirpath, _, filenames in os.walk(root):
     except Exception as e:
       print(f"[error reading file: {e}]")
     print()
-PY "${RESULTS_DIR}"
+PY
