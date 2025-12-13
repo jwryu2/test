@@ -24,24 +24,16 @@ print(f"Listing results under '{root}':\n")
 for dirpath, _, filenames in os.walk(root):
   filenames.sort()
   for fname in filenames:
+    if fname != "metrics.npy":
+      continue
     path = os.path.join(dirpath, fname)
     rel = os.path.relpath(path, root)
     print(f"--- {rel}")
-    ext = os.path.splitext(fname)[1].lower()
     try:
-      if ext == ".npy":
-        arr = np.load(path)
-        flat = arr.ravel()
-        preview = flat[:8]
-        print(f"type=npy shape={arr.shape} preview={preview}")
-      elif ext in {".txt", ".log", ".json"}:
-        with open(path, "r", errors="replace") as f:
-          content = f.read()
-        if len(content) > 2000:
-          content = content[:2000] + "\n...[truncated]..."
-        print(content.rstrip())
-      else:
-        print("[binary or unsupported file]")
+      arr = np.load(path)
+      flat = arr.ravel()
+      preview = flat[:8]
+      print(f"type=npy shape={arr.shape} preview={preview}")
     except Exception as e:
       print(f"[error reading file: {e}]")
     print()
