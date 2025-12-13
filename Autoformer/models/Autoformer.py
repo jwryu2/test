@@ -16,6 +16,11 @@ class Model(nn.Module):
         self.label_len = configs.label_len
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
+        ac_kwargs = dict(
+            temperature=getattr(configs, 'ac_temp', 1.0),
+            score_norm=bool(getattr(configs, 'ac_norm', 0)),
+            norm_eps=getattr(configs, 'ac_norm_eps', 1e-6),
+        )
 
         # Decomp
         kernel_size = configs.moving_avg
@@ -35,7 +40,7 @@ class Model(nn.Module):
                 EncoderLayer(
                     AutoCorrelationLayer(
                         AutoCorrelation(False, configs.factor, attention_dropout=configs.dropout,
-                                        output_attention=configs.output_attention),
+                                        output_attention=configs.output_attention, **ac_kwargs),
                         configs.d_model, configs.n_heads),
                     configs.d_model,
                     configs.d_ff,
@@ -52,11 +57,11 @@ class Model(nn.Module):
                 DecoderLayer(
                     AutoCorrelationLayer(
                         AutoCorrelation(True, configs.factor, attention_dropout=configs.dropout,
-                                        output_attention=False),
+                                        output_attention=False, **ac_kwargs),
                         configs.d_model, configs.n_heads),
                     AutoCorrelationLayer(
                         AutoCorrelation(False, configs.factor, attention_dropout=configs.dropout,
-                                        output_attention=False),
+                                        output_attention=False, **ac_kwargs),
                         configs.d_model, configs.n_heads),
                     configs.d_model,
                     configs.c_out,

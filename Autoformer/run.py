@@ -49,6 +49,9 @@ def main():
     parser.add_argument('--d_ff', type=int, default=2048, help='dimension of fcn')
     parser.add_argument('--moving_avg', type=int, default=25, help='window size of moving average')
     parser.add_argument('--factor', type=int, default=1, help='attn factor')
+    parser.add_argument('--ac_temp', type=float, default=1.0, help='temperature for autocorrelation lag weights')
+    parser.add_argument('--ac_norm', type=int, default=0, help='enable autocorrelation score normalization')
+    parser.add_argument('--ac_norm_eps', type=float, default=1e-6, help='epsilon for autocorrelation score std')
     parser.add_argument('--distil', action='store_false',
                         help='whether to use distilling in encoder, using this argument means not using distilling',
                         default=True)

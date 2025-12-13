@@ -10,13 +10,24 @@ class AutoCorrelation(nn.Module):
     (2) time delay aggregation
     This block can replace the self-attention family mechanism seamlessly.
     """
-    def __init__(self, mask_flag=True, factor=1, scale=None, attention_dropout=0.1, output_attention=False):
+    def __init__(self, mask_flag=True, factor=1, scale=None, attention_dropout=0.1, output_attention=False,
+                 temperature=1.0, score_norm=False, norm_eps=1e-6):
         super(AutoCorrelation, self).__init__()
         self.factor = factor
         self.scale = scale
         self.mask_flag = mask_flag
         self.output_attention = output_attention
         self.dropout = nn.Dropout(attention_dropout)
+        self.temperature = max(temperature, 1e-6)
+        self.score_norm = bool(score_norm)
+        self.norm_eps = norm_eps
+
+    def _maybe_norm_corr(self, corr):
+        if not self.score_norm:
+            return corr
+        mean = corr.mean(dim=-1, keepdim=True)
+        std = corr.std(dim=-1, keepdim=True)
+        return (corr - mean) / (std + self.norm_eps)
 
     def time_delay_agg_training(self, values, corr):
         """
@@ -32,7 +43,7 @@ class AutoCorrelation(nn.Module):
         index = torch.topk(torch.mean(mean_value, dim=0), top_k, dim=-1)[1]
         weights = torch.stack([mean_value[:, index[i]] for i in range(top_k)], dim=-1)
         # update corr
-        tmp_corr = torch.softmax(weights, dim=-1)
+        tmp_corr = torch.softmax(weights / self.temperature, dim=-1)
         # aggregation
         tmp_values = values
         delays_agg = torch.zeros_like(values).float()
@@ -59,7 +70,7 @@ class AutoCorrelation(nn.Module):
         mean_value = torch.mean(torch.mean(corr, dim=1), dim=1)
         weights, delay = torch.topk(mean_value, top_k, dim=-1)
         # update corr
-        tmp_corr = torch.softmax(weights, dim=-1)
+        tmp_corr = torch.softmax(weights / self.temperature, dim=-1)
         # aggregation
         tmp_values = values.repeat(1, 1, 1, 2)
         delays_agg = torch.zeros_like(values).float()
@@ -85,7 +96,7 @@ class AutoCorrelation(nn.Module):
         top_k = int(self.factor * math.log(length))
         weights, delay = torch.topk(corr, top_k, dim=-1)
         # update corr
-        tmp_corr = torch.softmax(weights, dim=-1)
+        tmp_corr = torch.softmax(weights / self.temperature, dim=-1)
         # aggregation
         tmp_values = values.repeat(1, 1, 1, 2)
         delays_agg = torch.zeros_like(values).float()
@@ -111,6 +122,7 @@ class AutoCorrelation(nn.Module):
         k_fft = torch.fft.rfft(keys.permute(0, 2, 3, 1).contiguous(), dim=-1)
         res = q_fft * torch.conj(k_fft)
         corr = torch.fft.irfft(res, n=L, dim=-1)
+        corr = self._maybe_norm_corr(corr)
 
         # time delay agg
         if self.training:
